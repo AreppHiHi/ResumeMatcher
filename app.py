@@ -116,4 +116,4 @@ if st.button("Run AI Matching"):
             else:
                 st.error("No text could be extracted from the uploaded files. Check if they are empty or corrupted.")
 
----
+st.bar_chart(...)
