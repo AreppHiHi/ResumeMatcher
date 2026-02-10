@@ -9,13 +9,9 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
 # --- 1. TESSERACT CONFIGURATION ---
-# This part detects if you are on Windows or the Cloud
+# Handles pathing for both your local Windows machine and Streamlit Cloud (Linux)
 if platform.system() == "Windows":
-    # Update this path if your tesseract is installed elsewhere
     pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
-else:
-    # On Streamlit Cloud/Linux, it is usually in the PATH automatically
-    pass
 
 # --- 2. EXTRACTION ENGINE ---
 def extract_text(uploaded_file):
@@ -43,21 +39,13 @@ def extract_text(uploaded_file):
         return ""
 
 # --- 3. STREAMLIT UI ---
-st.set_page_config(page_title="AI Resume Matcher", page_icon="🎯")
+st.set_page_config(page_title="AI Resume Matcher", page_icon="🎯", layout="wide")
 
 st.title("🎯 AI Resume Matcher")
-st.markdown("""
-    This tool uses **Natural Language Processing (NLP)** to compare resumes against a job description. 
-    It supports **PDFs, Word Docs, and Images (OCR)**.
-""")
-
-# Sidebar for instructions
-with st.sidebar:
-    st.header("How to use")
-    st.info("1. Paste the Job Description.\n2. Upload one or more resumes.\n3. Click Match.")
+st.markdown("Compare multiple resumes (PDF, DOCX, JPG) against a job description using NLP.")
 
 # Layout Columns
-col1, col2 = st.columns(2)
+col1, col2 = st.columns([1, 1])
 
 with col1:
     st.subheader("📋 Job Description")
@@ -65,7 +53,7 @@ with col1:
 
 with col2:
     st.subheader("📁 Upload Resumes")
-    resumes = st.file_uploader("Upload PDF, DOCX, or Images", 
+    resumes = st.file_uploader("Upload files", 
                                type=['pdf', 'docx', 'png', 'jpg', 'jpeg'], 
                                accept_multiple_files=True)
 
@@ -80,7 +68,7 @@ if st.button("Run AI Matching"):
             resume_texts = []
             filenames = []
             
-            # Process each file
+            # Process files
             for res in resumes:
                 content = extract_text(res)
                 if content:
@@ -88,32 +76,36 @@ if st.button("Run AI Matching"):
                     filenames.append(res.name)
             
             if resume_texts:
-                # Vectorization using TF-IDF
+                # ML Logic: TF-IDF Vectorization
                 all_documents = [jd_input] + resume_texts
                 vectorizer = TfidfVectorizer(stop_words='english')
                 tfidf_matrix = vectorizer.fit_transform(all_documents)
                 
-                # Calculate Cosine Similarity
-                # Index 0 is the Job Description, Index 1+ are the resumes
+                # Cosine Similarity calculation
                 scores = cosine_similarity(tfidf_matrix[0:1], tfidf_matrix[1:])[0]
                 
-                # Prepare Results Dataframe
+                # Create DataFrame for processing
                 results = pd.DataFrame({
                     "Candidate Name": filenames,
-                    "Match Score (%)": (scores * 100).round(2)
-                }).sort_values(by="Match Score (%)", ascending=False)
+                    "Match Score": (scores * 100).round(2)
+                }).sort_values(by="Match Score", ascending=False)
                 
-                # Display Results
+                # --- UI RESULTS ---
                 st.success("Matching Complete!")
-                
-                # Highlight the top candidate
                 st.balloons()
-                st.write("### Ranking Table")
-                st.dataframe(results, use_container_width=True)
-                
-                # Simple Data Visualization
-                st.bar_chart(results.set_index("Candidate Name"))
-            else:
-                st.error("No text could be extracted from the uploaded files. Check if they are empty or corrupted.")
 
-st.bar_chart(...)
+                # Display Table
+                st.write("### Ranking Table")
+                # We format the score for the table view
+                display_df = results.copy()
+                display_df["Match Score (%)"] = display_df["Match Score"].astype(str) + "%"
+                st.dataframe(display_df[["Candidate Name", "Match Score (%)"]], use_container_width=True)
+                
+                # Display Chart
+                st.write("### Visual Comparison")
+                # Set index to name so chart labels are correct
+                chart_data = results.set_index("Candidate Name")
+                st.bar_chart(chart_data)
+
+            else:
+                st.error("Could not extract any text. Check if files are scanned images without OCR or empty.")
