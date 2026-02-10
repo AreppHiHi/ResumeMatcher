@@ -1,0 +1,7 @@
+streamlit
+pandas
+scikit-learn
+pytesseract
+Pillow
+PyPDF2
+python-docx
